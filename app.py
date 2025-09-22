@@ -21,9 +21,11 @@ def load_artifacts():
     model = joblib.load("churn_model.pkl")              # Trained ML model
     label_encoders = joblib.load("label_encoders.pkl")  # Dict of label encoders
     scaler = joblib.load("scaler.pkl")                  # Scaler
-    return model, label_encoders, scaler
+    # 🔑 Also load feature names used in training
+    feature_names = joblib.load("feature_names.pkl")
+    return model, label_encoders, scaler, feature_names
 
-model, label_encoders, scaler = load_artifacts()
+model, label_encoders, scaler, feature_names = load_artifacts()
 
 # ----------------------------
 # App Title
@@ -60,21 +62,18 @@ input_df = user_input_features()
 # ----------------------------
 # Align with Training Features
 # ----------------------------
-# 🚨 Replace this list with EXACT features used in training
-all_features = [
-    'tenure', 'MonthlyCharges', 'TotalCharges', 'Contract',
-    'InternetService', 'PaymentMethod', 'Dependents',
-    'DeviceProtection', 'MultipleLines', 'OnlineBackup',
-    'OnlineSecurity', 'TechSupport', 'StreamingTV', 'StreamingMovies'
-]
-
-# Add missing features with default value "No"
-for col in all_features:
+# Add missing features with default values
+for col in feature_names:
     if col not in input_df.columns:
-        input_df[col] = "No"
+        if col.lower() == "customerid":
+            input_df[col] = "0000"   # Dummy ID
+        elif col in ['SeniorCitizen']:
+            input_df[col] = 0        # Default numeric
+        else:
+            input_df[col] = "No"     # Default categorical
 
-# Reorder columns same as training
-input_df = input_df[all_features]
+# Reorder to match training dataset
+input_df = input_df[feature_names]
 
 # ----------------------------
 # Preprocessing
@@ -82,18 +81,17 @@ input_df = input_df[all_features]
 def preprocess_input(df, label_encoders, scaler):
     df_processed = df.copy()
 
-    # Apply label encoders to categorical features
+    # Encode categorical features
     for col, le in label_encoders.items():
         if col in df_processed.columns:
             try:
                 df_processed[col] = le.transform(df_processed[col])
             except ValueError:
-                # Handle unseen category → assign -1
                 df_processed[col] = df_processed[col].map(
                     lambda x: le.transform([x])[0] if x in le.classes_ else -1
                 )
 
-    # Scale features
+    # Scale
     df_processed = scaler.transform(df_processed)
     return df_processed
 
