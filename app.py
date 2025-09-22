@@ -14,16 +14,16 @@ st.set_page_config(
 )
 
 # ----------------------------
-# Load Model
+# Load Model, Scaler, Encoders
 # ----------------------------
 @st.cache_data
-def load_model():
-    model = joblib.load('churn_model.pkl')
-    model = joblib.load('label_encoders.pkl')
-    model = joblib.load('scaler.pkl')
-    return model
+def load_artifacts():
+    model = joblib.load("churn_model.pkl")           # ML Model
+    label_encoders = joblib.load("label_encoders.pkl")  # Encoders for categorical features
+    scaler = joblib.load("scaler.pkl")              # Scaler
+    return model, label_encoders, scaler
 
-model = load_model()
+model, label_encoders, scaler = load_artifacts()
 
 # ----------------------------
 # App Title
@@ -58,13 +58,30 @@ def user_input_features():
 input_df = user_input_features()
 
 # ----------------------------
+# Preprocessing
+# ----------------------------
+def preprocess_input(df, label_encoders, scaler):
+    df_processed = df.copy()
+    
+    # Apply label encoders for categorical columns
+    for col, le in label_encoders.items():
+        if col in df_processed.columns:
+            df_processed[col] = le.transform(df_processed[col])
+    
+    # Apply scaler for numerical columns
+    df_processed = scaler.transform(df_processed)
+    
+    return df_processed
+
+# ----------------------------
 # Prediction
 # ----------------------------
 st.subheader("Prediction 🔮")
 
 try:
-    prediction = model.predict(input_df)
-    prediction_proba = model.predict_proba(input_df)
+    processed_input = preprocess_input(input_df, label_encoders, scaler)
+    prediction = model.predict(processed_input)
+    prediction_proba = model.predict_proba(processed_input)
 
     if prediction[0] == 1:
         st.error(f"The customer is likely to churn 😢 (Probability: {prediction_proba[0][1]*100:.2f}%)")
