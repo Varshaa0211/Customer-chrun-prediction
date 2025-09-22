@@ -1,89 +1,89 @@
+
+
 import streamlit as st
+import pandas as pd
 import numpy as np
-import pickle
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.linear_model import LogisticRegression
 
-# ----------------------------
-# Page Configuration
-# ----------------------------
-st.set_page_config(
-    page_title="💼 Customer Churn Prediction",
-    page_icon="📊",
-    layout="centered",
-    initial_sidebar_state="expanded"
-)
+# Load dataset
+@st.cache_data
+def load_data():
+    df = pd.read_csv("customer_churn Raw data.csv")
+    return df
 
-# ----------------------------
-# Load Model, Scaler, and Encoder
-# ----------------------------
-try:
-    with open("churn_model.pkl", "rb") as f:
-        model = pickle.load(f)
-    with open("scaler.pkl", "rb") as f:
-        scaler = pickle.load(f)
-    with open("label_encoder.pkl", "rb") as f:
-        le = pickle.load(f)
-except FileNotFoundError:
-    st.error("❌ Model or preprocessing files not found! Make sure 'churn_model.pkl', 'scaler.pkl', and 'label_encoder.pkl' are in the same folder as this app.")
-    st.stop()
+df = load_data()
 
-# ----------------------------
-# App Title
-# ----------------------------
-st.title("💼 Customer Churn Prediction App")
-st.markdown("""
-Predict whether a customer is likely to **churn** or **stay**.  
-Enter customer details below and click **Predict** 🚀
-""")
+st.set_page_config(page_title="Customer Churn Prediction", page_icon="📊", layout="centered")
 
-# ----------------------------
-# User Input Section
-# ----------------------------
-st.header("🔹 Enter Customer Details")
+st.title("📊 Customer Churn Prediction App")
 
-credit_score = st.number_input("Credit Score", min_value=300, max_value=900, value=650)
-age = st.number_input("Age", min_value=18, max_value=100, value=35)
-tenure = st.number_input("Tenure (Years with Company)", min_value=0, max_value=10, value=3)
-balance = st.number_input("Account Balance", min_value=0.0, value=50000.0, step=1000.0)
-num_of_products = st.number_input("Number of Products", min_value=1, max_value=5, value=2)
-has_cr_card = st.selectbox("Has Credit Card?", ("Yes", "No"))
-is_active_member = st.selectbox("Is Active Member?", ("Yes", "No"))
-estimated_salary = st.number_input("Estimated Salary", min_value=0.0, value=50000.0, step=1000.0)
-gender = st.selectbox("Gender", ("Male", "Female"))
+st.write("🚀 இந்த app உங்கள் dataset (`customer_churn Raw data.csv`) வைத்து **customer churn** predict செய்கிறது.")
 
-# ----------------------------
-# Preprocess Input
-# ----------------------------
-try:
-    gender_encoded = le.transform([gender])[0]
-except:
-    st.error("❌ Label Encoder Error! Make sure the encoder matches the training data categories.")
-    st.stop()
+# Display dataset preview
+if st.checkbox("👀 Show Dataset Preview"):
+    st.dataframe(df.head())
 
-has_cr_card_encoded = 1 if has_cr_card == "Yes" else 0
-is_active_member_encoded = 1 if is_active_member == "Yes" else 0
+# --------------------
+# Preprocessing
+# --------------------
+df_clean = df.copy()
 
-user_input = np.array([[credit_score, age, tenure, balance,
-                        num_of_products, has_cr_card_encoded, 
-                        is_active_member_encoded, estimated_salary, gender_encoded]])
+# Convert categorical columns to numeric
+label_encoders = {}
+for col in df_clean.select_dtypes(include=["object"]).columns:
+    le = LabelEncoder()
+    df_clean[col] = le.fit_transform(df_clean[col].astype(str))
+    label_encoders[col] = le
 
-user_input_scaled = scaler.transform(user_input)
+# Features and target
+X = df_clean.drop("Exited", axis=1, errors="ignore")  # "Exited" target column assumed
+y = df_clean["Exited"]
 
-# ----------------------------
-# Prediction
-# ----------------------------
-if st.button("Predict Churn 🔮"):
-    prediction = model.predict(user_input_scaled)[0]
-    probability = model.predict_proba(user_input_scaled)[0][1]
+# Scale features
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
 
-    if prediction == 1:
-        st.error(f"⚠️ The customer is likely to **churn**. Probability: {probability:.2f}")
+# Train/Test split
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+
+# Train model
+model = LogisticRegression(max_iter=1000)
+model.fit(X_train, y_train)
+
+st.subheader("🔮 Enter Customer Details Below")
+
+# Dynamic input fields based on dataset columns
+user_input = {}
+for col in X.columns:
+    if df[col].dtype == "object":
+        options = df[col].unique().tolist()
+        user_input[col] = st.selectbox(f"📌 {col}", options)
     else:
-        st.success(f"✅ The customer is likely to **stay**. Probability: {1-probability:.2f}")
+        min_val = float(df[col].min())
+        max_val = float(df[col].max())
+        mean_val = float(df[col].mean())
+        user_input[col] = st.number_input(f"📈 {col}", min_val, max_val, mean_val)
 
-# ----------------------------
-# Footer
-# ----------------------------
-st.markdown("""
----
-Developed by Varsha ❤️ 
-""")
+# Predict button
+if st.button("✨ Predict Now"):
+    input_df = pd.DataFrame([user_input])
+
+    # Encode categorical inputs
+    for col, le in label_encoders.items():
+        if col in input_df:
+            input_df[col] = le.transform(input_df[col].astype(str))
+
+    # Scale
+    input_scaled = scaler.transform(input_df)
+
+    # Predict
+    prediction = model.predict(input_scaled)[0]
+    probability = model.predict_proba(input_scaled)[0][1]
+
+    st.markdown("---")
+    if prediction == 1:
+        st.error(f"⚠️ **Result:** This customer is likely to **CHURN** 💔 \n\n 🔢 Probability: **{probability:.2f}**")
+    else:
+        st.success(f"✅ **Result:** This customer is **NOT likely to churn** 🎉 \n\n 🔢 Probability: **{probability:.2f}**")
