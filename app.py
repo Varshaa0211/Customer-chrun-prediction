@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # ----------------------------
-# Load Model, Scaler, Encoders
+# Load Model, Encoders, Scaler
 # ----------------------------
 @st.cache_data
 def load_artifacts():
@@ -43,7 +43,7 @@ def user_input_features():
     contract = st.sidebar.selectbox("Contract Type 📄", ("Month-to-month", "One year", "Two year"))
     internet_service = st.sidebar.selectbox("Internet Service 🌐", ("DSL", "Fiber optic", "No"))
     payment_method = st.sidebar.selectbox("Payment Method 💳", ("Electronic check", "Mailed check", "Bank transfer", "Credit card"))
-    
+
     data = {
         'tenure': tenure,
         'MonthlyCharges': monthly_charges,
@@ -56,6 +56,25 @@ def user_input_features():
     return features
 
 input_df = user_input_features()
+
+# ----------------------------
+# Align with Training Features
+# ----------------------------
+# 🚨 Replace this list with EXACT features used in training
+all_features = [
+    'tenure', 'MonthlyCharges', 'TotalCharges', 'Contract',
+    'InternetService', 'PaymentMethod', 'Dependents',
+    'DeviceProtection', 'MultipleLines', 'OnlineBackup',
+    'OnlineSecurity', 'TechSupport', 'StreamingTV', 'StreamingMovies'
+]
+
+# Add missing features with default value "No"
+for col in all_features:
+    if col not in input_df.columns:
+        input_df[col] = "No"
+
+# Reorder columns same as training
+input_df = input_df[all_features]
 
 # ----------------------------
 # Preprocessing
@@ -74,7 +93,7 @@ def preprocess_input(df, label_encoders, scaler):
                     lambda x: le.transform([x])[0] if x in le.classes_ else -1
                 )
 
-    # Scale full feature set
+    # Scale features
     df_processed = scaler.transform(df_processed)
     return df_processed
 
@@ -100,4 +119,3 @@ except Exception as e:
 # ----------------------------
 st.subheader("Customer Input Features 🧾")
 st.write(input_df)
-
