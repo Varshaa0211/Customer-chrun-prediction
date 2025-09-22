@@ -15,14 +15,16 @@ st.set_page_config(
 # ----------------------------
 # Load Model, Scaler, and Encoder
 # ----------------------------
-with open("churn_model.pkl", "rb") as f:
-    model = pickle.load(f)
-
-with open("scaler.pkl", "rb") as f:
-    scaler = pickle.load(f)
-
-with open("label_encoder.pkl", "rb") as f:
-    le = pickle.load(f)
+try:
+    with open("churn_model.pkl", "rb") as f:
+        model = pickle.load(f)
+    with open("scaler.pkl", "rb") as f:
+        scaler = pickle.load(f)
+    with open("label_encoder.pkl", "rb") as f:
+        le = pickle.load(f)
+except FileNotFoundError:
+    st.error("❌ Model or preprocessing files not found! Make sure 'churn_model.pkl', 'scaler.pkl', and 'label_encoder.pkl' are in the same folder as this app.")
+    st.stop()
 
 # ----------------------------
 # App Title
@@ -51,17 +53,19 @@ gender = st.selectbox("Gender", ("Male", "Female"))
 # ----------------------------
 # Preprocess Input
 # ----------------------------
-# Encode categorical features using LabelEncoder
-gender_encoded = le.transform([gender])[0]
+try:
+    gender_encoded = le.transform([gender])[0]
+except:
+    st.error("❌ Label Encoder Error! Make sure the encoder matches the training data categories.")
+    st.stop()
+
 has_cr_card_encoded = 1 if has_cr_card == "Yes" else 0
 is_active_member_encoded = 1 if is_active_member == "Yes" else 0
 
-# Combine all features
 user_input = np.array([[credit_score, age, tenure, balance,
                         num_of_products, has_cr_card_encoded, 
                         is_active_member_encoded, estimated_salary, gender_encoded]])
 
-# Scale numerical features
 user_input_scaled = scaler.transform(user_input)
 
 # ----------------------------
