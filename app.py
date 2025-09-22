@@ -1,119 +1,85 @@
 import streamlit as st
-import pandas as pd
 import numpy as np
-import joblib
+import pickle
 
 # ----------------------------
-# Page Config
+# Page Configuration
 # ----------------------------
 st.set_page_config(
-    page_title="📊 Customer Churn Prediction",
-    page_icon="💼",
+    page_title="💼 Customer Churn Prediction",
+    page_icon="📊",
     layout="centered",
     initial_sidebar_state="expanded"
 )
 
 # ----------------------------
-# Load Model, Encoders, Scaler
+# Load Model, Scaler, and Encoder
 # ----------------------------
-@st.cache_data
-def load_artifacts():
-    model = joblib.load("churn_model.pkl")              # Trained ML model
-    label_encoders = joblib.load("label_encoders.pkl")  # Dict of label encoders
-    scaler = joblib.load("scaler.pkl")                  # Scaler
-    # 🔑 Also load feature names used in training
-    feature_names = joblib.load("feature_names.pkl")
-    return model, label_encoders, scaler, feature_names
+with open("churn_model.pkl", "rb") as f:
+    model = pickle.load(f)
 
-model, label_encoders, scaler, feature_names = load_artifacts()
+with open("scaler.pkl", "rb") as f:
+    scaler = pickle.load(f)
+
+with open("label_encoder.pkl", "rb") as f:
+    le = pickle.load(f)
 
 # ----------------------------
 # App Title
 # ----------------------------
-st.markdown("<h1 style='text-align: center; color: #4B0082;'>💼 Customer Churn Predictor 💼</h1>", unsafe_allow_html=True)
-st.write("Predict if a customer is likely to churn or stay! 📈")
+st.title("💼 Customer Churn Prediction App")
+st.markdown("""
+Predict whether a customer is likely to **churn** or **stay**.  
+Enter customer details below and click **Predict** 🚀
+""")
 
 # ----------------------------
-# User Input
+# User Input Section
 # ----------------------------
-st.sidebar.header("Customer Input Features 📝")
+st.header("🔹 Enter Customer Details")
 
-def user_input_features():
-    tenure = st.sidebar.number_input("Tenure (Months) ⏳", min_value=0, max_value=100, value=12)
-    monthly_charges = st.sidebar.number_input("Monthly Charges 💰", min_value=0.0, max_value=1000.0, value=70.0)
-    total_charges = st.sidebar.number_input("Total Charges 💵", min_value=0.0, max_value=10000.0, value=1500.0)
-    contract = st.sidebar.selectbox("Contract Type 📄", ("Month-to-month", "One year", "Two year"))
-    internet_service = st.sidebar.selectbox("Internet Service 🌐", ("DSL", "Fiber optic", "No"))
-    payment_method = st.sidebar.selectbox("Payment Method 💳", ("Electronic check", "Mailed check", "Bank transfer", "Credit card"))
-
-    data = {
-        'tenure': tenure,
-        'MonthlyCharges': monthly_charges,
-        'TotalCharges': total_charges,
-        'Contract': contract,
-        'InternetService': internet_service,
-        'PaymentMethod': payment_method
-    }
-    features = pd.DataFrame(data, index=[0])
-    return features
-
-input_df = user_input_features()
+credit_score = st.number_input("Credit Score", min_value=300, max_value=900, value=650)
+age = st.number_input("Age", min_value=18, max_value=100, value=35)
+tenure = st.number_input("Tenure (Years with Company)", min_value=0, max_value=10, value=3)
+balance = st.number_input("Account Balance", min_value=0.0, value=50000.0, step=1000.0)
+num_of_products = st.number_input("Number of Products", min_value=1, max_value=5, value=2)
+has_cr_card = st.selectbox("Has Credit Card?", ("Yes", "No"))
+is_active_member = st.selectbox("Is Active Member?", ("Yes", "No"))
+estimated_salary = st.number_input("Estimated Salary", min_value=0.0, value=50000.0, step=1000.0)
+gender = st.selectbox("Gender", ("Male", "Female"))
 
 # ----------------------------
-# Align with Training Features
+# Preprocess Input
 # ----------------------------
-# Add missing features with default values
-for col in feature_names:
-    if col not in input_df.columns:
-        if col.lower() == "customerid":
-            input_df[col] = "0000"   # Dummy ID
-        elif col in ['SeniorCitizen']:
-            input_df[col] = 0        # Default numeric
-        else:
-            input_df[col] = "No"     # Default categorical
+# Encode categorical features using LabelEncoder
+gender_encoded = le.transform([gender])[0]
+has_cr_card_encoded = 1 if has_cr_card == "Yes" else 0
+is_active_member_encoded = 1 if is_active_member == "Yes" else 0
 
-# Reorder to match training dataset
-input_df = input_df[feature_names]
+# Combine all features
+user_input = np.array([[credit_score, age, tenure, balance,
+                        num_of_products, has_cr_card_encoded, 
+                        is_active_member_encoded, estimated_salary, gender_encoded]])
 
-# ----------------------------
-# Preprocessing
-# ----------------------------
-def preprocess_input(df, label_encoders, scaler):
-    df_processed = df.copy()
-
-    # Encode categorical features
-    for col, le in label_encoders.items():
-        if col in df_processed.columns:
-            try:
-                df_processed[col] = le.transform(df_processed[col])
-            except ValueError:
-                df_processed[col] = df_processed[col].map(
-                    lambda x: le.transform([x])[0] if x in le.classes_ else -1
-                )
-
-    # Scale
-    df_processed = scaler.transform(df_processed)
-    return df_processed
+# Scale numerical features
+user_input_scaled = scaler.transform(user_input)
 
 # ----------------------------
 # Prediction
 # ----------------------------
-st.subheader("Prediction 🔮")
+if st.button("Predict Churn 🔮"):
+    prediction = model.predict(user_input_scaled)[0]
+    probability = model.predict_proba(user_input_scaled)[0][1]
 
-try:
-    processed_input = preprocess_input(input_df, label_encoders, scaler)
-    prediction = model.predict(processed_input)
-    prediction_proba = model.predict_proba(processed_input)
-
-    if prediction[0] == 1:
-        st.error(f"The customer is likely to churn 😢 (Probability: {prediction_proba[0][1]*100:.2f}%)")
+    if prediction == 1:
+        st.error(f"⚠️ The customer is likely to **churn**. Probability: {probability:.2f}")
     else:
-        st.success(f"The customer is likely to stay 😀 (Probability: {prediction_proba[0][0]*100:.2f}%)")
-except Exception as e:
-    st.warning(f"⚠️ Prediction failed: {e}")
+        st.success(f"✅ The customer is likely to **stay**. Probability: {1-probability:.2f}")
 
 # ----------------------------
-# Show Input Data
+# Footer
 # ----------------------------
-st.subheader("Customer Input Features 🧾")
-st.write(input_df)
+st.markdown("""
+---
+Developed by Varsha ❤️ 
+""")
