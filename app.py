@@ -18,9 +18,9 @@ st.set_page_config(
 # ----------------------------
 @st.cache_data
 def load_artifacts():
-    model = joblib.load("churn_model.pkl")           # ML Model
-    label_encoders = joblib.load("label_encoders.pkl")  # Encoders for categorical features
-    scaler = joblib.load("scaler.pkl")              # Scaler
+    model = joblib.load("churn_model.pkl")              # Trained ML model
+    label_encoders = joblib.load("label_encoders.pkl")  # Dict of label encoders
+    scaler = joblib.load("scaler.pkl")                  # Scaler
     return model, label_encoders, scaler
 
 model, label_encoders, scaler = load_artifacts()
@@ -62,15 +62,20 @@ input_df = user_input_features()
 # ----------------------------
 def preprocess_input(df, label_encoders, scaler):
     df_processed = df.copy()
-    
-    # Apply label encoders for categorical columns
+
+    # Apply label encoders to categorical features
     for col, le in label_encoders.items():
         if col in df_processed.columns:
-            df_processed[col] = le.transform(df_processed[col])
-    
-    # Apply scaler for numerical columns
+            try:
+                df_processed[col] = le.transform(df_processed[col])
+            except ValueError:
+                # Handle unseen category → assign -1
+                df_processed[col] = df_processed[col].map(
+                    lambda x: le.transform([x])[0] if x in le.classes_ else -1
+                )
+
+    # Scale full feature set
     df_processed = scaler.transform(df_processed)
-    
     return df_processed
 
 # ----------------------------
@@ -95,3 +100,4 @@ except Exception as e:
 # ----------------------------
 st.subheader("Customer Input Features 🧾")
 st.write(input_df)
+
