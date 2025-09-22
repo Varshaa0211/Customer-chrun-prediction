@@ -19,6 +19,8 @@ st.set_page_config(
 @st.cache_data
 def load_model():
     model = joblib.load('churn_model.pkl')
+    model = joblib.load('label_encoders.pkl')
+    model = joblib.load('scaler.pkl')
     return model
 
 model = load_model()
