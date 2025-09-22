@@ -8,12 +8,11 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.linear_model import LogisticRegression
 
 # Load dataset
-@st.cache_data
-def load_data():
-    df = pd.read_csv("customer_churn Raw data.csv")
-    return df
 
-df = load_data()
+
+    df = pd.read_csv("customer_churn Raw data.csv")
+ 
+
 
 st.set_page_config(page_title="Customer Churn Prediction", page_icon="📊", layout="centered")
 
