@@ -87,16 +87,6 @@ with col1:
             except Exception as e:
                 st.error(f"Prediction failed: {e}")
 
-with col2:
-    st.subheader("Batch prediction (CSV upload) 📁")
-    uploaded_csv = st.file_uploader("Upload CSV for batch predictions", type=["csv"])
-
-    if uploaded_csv is not None:
-        try:
-            df = pd.read_csv(uploaded_csv)
-            st.write(f"Uploaded {df.shape[0]} rows and {df.shape[1]} columns.")
-            st.dataframe(df.head())
-
             if model is None:
                 st.error("No model loaded. Upload `churn_model.pkl`.")
             else:
