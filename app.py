@@ -1,6 +1,6 @@
 import streamlit as st
-import numpy as np
 import joblib
+import pandas as pd
 
 # ----------------------------
 # Page Config
@@ -56,39 +56,40 @@ if model:
     monthly_charges = st.number_input("💵 Monthly Charges", min_value=0.0, value=50.0)
     total_charges = st.number_input("💰 Total Charges", min_value=0.0, value=100.0)
 
-    # Convert to dictionary for pipeline
-    input_data = {
-        "gender": gender,
-        "SeniorCitizen": senior_citizen,
-        "Partner": partner,
-        "Dependents": dependents,
-        "tenure": tenure,
-        "PhoneService": phone_service,
-        "MultipleLines": multiple_lines,
-        "InternetService": internet_service,
-        "OnlineSecurity": online_security,
-        "OnlineBackup": online_backup,
-        "DeviceProtection": device_protection,
-        "TechSupport": tech_support,
-        "StreamingTV": streaming_tv,
-        "StreamingMovies": streaming_movies,
-        "Contract": contract,
-        "PaperlessBilling": paperless_billing,
-        "PaymentMethod": payment_method,
-        "MonthlyCharges": monthly_charges,
-        "TotalCharges": total_charges,
+    # Convert input to dataframe (matching training format)
+    input_dict = {
+        "gender": [gender],
+        "SeniorCitizen": [senior_citizen],
+        "Partner": [partner],
+        "Dependents": [dependents],
+        "tenure": [tenure],
+        "PhoneService": [phone_service],
+        "MultipleLines": [multiple_lines],
+        "InternetService": [internet_service],
+        "OnlineSecurity": [online_security],
+        "OnlineBackup": [online_backup],
+        "DeviceProtection": [device_protection],
+        "TechSupport": [tech_support],
+        "StreamingTV": [streaming_tv],
+        "StreamingMovies": [streaming_movies],
+        "Contract": [contract],
+        "PaperlessBilling": [paperless_billing],
+        "PaymentMethod": [payment_method],
+        "MonthlyCharges": [monthly_charges],
+        "TotalCharges": [total_charges],
     }
+    input_df = pd.DataFrame(input_dict)
 
     # Prediction
     if st.button("🔮 Predict Churn"):
         try:
-            pred = model.predict([list(input_data.values())])[0]
-            prob = model.predict_proba([list(input_data.values())])[0][1]
+            prediction = model.predict(input_df)[0]
+            probability = model.predict_proba(input_df)[0][1]
 
-            if pred == 1:
-                st.error(f"⚠️ Customer is **likely to churn** (probability: {prob:.2f})")
+            if prediction == 1:
+                st.error(f"⚠️ Customer is **likely to churn** (probability: {probability:.2f})")
             else:
-                st.success(f"✅ Customer is **not likely to churn** (probability: {prob:.2f})")
+                st.success(f"✅ Customer is **not likely to churn** (probability: {probability:.2f})")
         except Exception as e:
             st.error(f"Prediction failed: {e}")
 
