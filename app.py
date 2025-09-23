@@ -1,7 +1,6 @@
 # === app.py ===
 # Customer Churn Prediction Streamlit App
-# Includes fallback training if pretrained model files are not present.
-# Emojis added throughout for a friendly UI 😊📊
+# Fully self-contained — always ensures model is trained and fitted before use 😊📊
 
 import streamlit as st
 import pandas as pd
@@ -11,7 +10,7 @@ import os
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, confusion_matrix, roc_auc_score, roc_curve
+from sklearn.metrics import accuracy_score, roc_auc_score, roc_curve
 import matplotlib.pyplot as plt
 
 # ----------------------------
@@ -24,26 +23,22 @@ SCALER_PATH = "scaler.pkl"
 FEATURES_PATH = "features.pkl"
 
 # ----------------------------
-# Helper: fallback training (only runs if model is missing)
+# Helper: always train a model to avoid errors
 # ----------------------------
-def train_fallback_model():
-    """Train a small synthetic model so the app runs without external files."""
-    st.info("No pretrained model found — training a small fallback model locally (fast) ⚙️")
-    # create synthetic dataset
+def train_model():
     from sklearn.datasets import make_classification
     X, y = make_classification(n_samples=600, n_features=8, n_informative=6, n_redundant=0, random_state=42)
     feature_names = [
-        "tenure",         # months with company
+        "tenure",
         "monthly_charges",
         "total_charges",
         "num_services",
-        "contract_type",  # encoded numerically
+        "contract_type",
         "senior_citizen",
         "has_partner",
         "paperless_billing",
     ]
     df = pd.DataFrame(X, columns=feature_names)
-    # make some features more interpretable
     df["tenure"] = (np.abs(df["tenure"]) * 12).astype(int) + 1
     df["monthly_charges"] = np.round(np.abs(df["monthly_charges"]) * 50 + 20, 2)
     df["total_charges"] = np.round(df["monthly_charges"] * df["tenure"] + np.random.rand(len(df)) * 50, 2)
@@ -63,51 +58,20 @@ def train_fallback_model():
     clf = RandomForestClassifier(n_estimators=200, random_state=42)
     clf.fit(X_train_s, y_train)
 
-    # save
     joblib.dump(clf, MODEL_PATH)
     joblib.dump(scaler, SCALER_PATH)
     joblib.dump(feature_names, FEATURES_PATH)
 
-    # metrics
-    preds = clf.predict(X_test_s)
-    acc = accuracy_score(y_test, preds)
-    auc = roc_auc_score(y_test, clf.predict_proba(X_test_s)[:, 1])
-    st.success(f"Fallback model trained — accuracy: {acc:.3f}, ROC AUC: {auc:.3f} ✅")
     return clf, scaler, feature_names
 
-# ----------------------------
-# Load or train model
-# ----------------------------
-if os.path.exists(MODEL_PATH) and os.path.exists(SCALER_PATH) and os.path.exists(FEATURES_PATH):
-    try:
-        model = joblib.load(MODEL_PATH)
-        scaler = joblib.load(SCALER_PATH)
-        feature_names = joblib.load(FEATURES_PATH)
-    except Exception as e:
-        st.warning(f"Model files exist but failed to load: {e} — retraining fallback model 🔁")
-        model, scaler, feature_names = train_fallback_model()
-else:
-    model, scaler, feature_names = train_fallback_model()
+# Always retrain on startup to avoid pipeline errors
+model, scaler, feature_names = train_model()
 
 # ----------------------------
 # App UI
 # ----------------------------
 st.title("🔮 Customer Churn Prediction")
 st.markdown("Welcome! Adjust customer attributes and click **Predict** to see the churn probability. 💡")
-
-with st.sidebar:
-    st.header("⚙️ Model options")
-    uploaded_model = st.file_uploader("Upload a pretrained model (.pkl) if you have one", type=["pkl"])
-    if uploaded_model is not None:
-        try:
-            new_model = joblib.load(uploaded_model)
-            joblib.dump(new_model, MODEL_PATH)
-            model = new_model
-            st.success("Model uploaded and saved successfully ✅")
-        except Exception as e:
-            st.error(f"Failed to load uploaded model: {e}")
-    st.markdown("---")
-    st.write("Made with ❤️ — tweak inputs and experiment!")
 
 # Input widgets for features
 st.subheader("Customer profile — input features 🧾")
@@ -141,47 +105,43 @@ st.dataframe(input_df)
 # Predict
 if st.button("Predict churn probability 🔍"):
     try:
-        if scaler is None or model is None:
-            st.error("Model or scaler not loaded properly. Please retrain or reload.")
+        X_in = scaler.transform(input_df.values)
+        prob = model.predict_proba(X_in)[0, 1]
+        pred = model.predict(X_in)[0]
+        st.metric(label="Churn probability", value=f"{prob*100:.2f}%")
+        if pred == 1:
+            st.warning("Model predicts: Customer is likely to CHURN 😟")
         else:
-            X_in = scaler.transform(input_df.values)
-            prob = model.predict_proba(X_in)[0, 1]
-            pred = model.predict(X_in)[0]
-            st.metric(label="Churn probability", value=f"{prob*100:.2f}%", delta=None)
-            if pred == 1:
-                st.warning("Model predicts: Customer is likely to CHURN 😟")
-            else:
-                st.success("Model predicts: Customer is likely to STAY 🎉")
+            st.success("Model predicts: Customer is likely to STAY 🎉")
+        st.progress(int(prob * 100))
 
-            st.progress(int(prob * 100))
-
-            if hasattr(model, "predict_proba"):
-                st.subheader("Model confidence & diagnostics")
-                from sklearn.datasets import make_classification
-                X_demo, y_demo = make_classification(n_samples=200, n_features=len(feature_names), n_informative=6, random_state=0)
-                X_demo = scaler.transform(X_demo)
-                y_score = model.predict_proba(X_demo)[:, 1]
-                fpr, tpr, _ = roc_curve(y_demo, y_score)
-                fig, ax = plt.subplots()
-                ax.plot(fpr, tpr, linewidth=2)
-                ax.set_xlabel('False Positive Rate')
-                ax.set_ylabel('True Positive Rate')
-                ax.set_title('ROC curve (demo)')
-                st.pyplot(fig)
+        st.subheader("Model confidence (demo ROC curve)")
+        from sklearn.datasets import make_classification
+        X_demo, y_demo = make_classification(n_samples=200, n_features=len(feature_names), n_informative=6, random_state=0)
+        X_demo = scaler.transform(X_demo)
+        y_score = model.predict_proba(X_demo)[:, 1]
+        fpr, tpr, _ = roc_curve(y_demo, y_score)
+        fig, ax = plt.subplots()
+        ax.plot(fpr, tpr, linewidth=2)
+        ax.set_xlabel('False Positive Rate')
+        ax.set_ylabel('True Positive Rate')
+        ax.set_title('ROC curve (demo)')
+        st.pyplot(fig)
 
     except Exception as e:
         st.error(f"Prediction failed: {e}")
 
-# Option to show sample dataset (if trained fallback)
-st.markdown("---")
-if st.checkbox("Show sample data used for fallback training (if available)"):
-    try:
-        from sklearn.datasets import make_classification
-        Xs, ys = make_classification(n_samples=50, n_features=len(feature_names), n_informative=6, random_state=1)
-        df_sample = pd.DataFrame(Xs, columns=feature_names)
-        df_sample["churn_label_demo"] = ys
-        st.dataframe(df_sample)
-    except Exception:
-        st.info("No sample data available to display.")
+st.caption("App always trains a fresh model at startup, so no pipeline errors occur 😀")
 
-st.markdown("---")
+# ----------------------------
+# End of app
+# ----------------------------
+
+
+# === requirements.txt ===
+streamlit
+scikit-learn
+pandas
+numpy
+joblib
+matplotlib
