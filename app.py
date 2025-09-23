@@ -6,7 +6,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import os
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -17,10 +16,6 @@ import matplotlib.pyplot as plt
 # Page config
 # ----------------------------
 st.set_page_config(page_title="🔮 Customer Churn Predictor", page_icon="📉", layout="centered")
-
-MODEL_PATH = "churn_model.pkl"
-SCALER_PATH = "scaler.pkl"
-FEATURES_PATH = "features.pkl"
 
 # ----------------------------
 # Helper: always train a model to avoid errors
@@ -57,10 +52,6 @@ def train_model():
 
     clf = RandomForestClassifier(n_estimators=200, random_state=42)
     clf.fit(X_train_s, y_train)
-
-    joblib.dump(clf, MODEL_PATH)
-    joblib.dump(scaler, SCALER_PATH)
-    joblib.dump(feature_names, FEATURES_PATH)
 
     return clf, scaler, feature_names
 
@@ -133,15 +124,3 @@ if st.button("Predict churn probability 🔍"):
 
 st.caption("App always trains a fresh model at startup, so no pipeline errors occur 😀")
 
-# ----------------------------
-# End of app
-# ----------------------------
-
-
-# === requirements.txt ===
-streamlit
-scikit-learn
-pandas
-numpy
-joblib
-matplotlib
