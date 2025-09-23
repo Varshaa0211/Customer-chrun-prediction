@@ -1,15 +1,14 @@
 import streamlit as st
-import joblib
 import pandas as pd
+import joblib
 
 # ----------------------------
 # Page Config
 # ----------------------------
 st.set_page_config(
-    page_title="💼 Customer Churn Prediction",
+    page_title="💼 Customer Churn Predictor",
     page_icon="📊",
-    layout="centered",
-    initial_sidebar_state="expanded"
+    layout="centered"
 )
 
 # ----------------------------
@@ -27,18 +26,21 @@ def load_model():
 model = load_model()
 
 # ----------------------------
-# UI
+# Title
 # ----------------------------
-st.title("💼 Customer Churn Prediction App")
-st.write("Predict whether a customer will **churn** or **stay** 📊")
+st.title("💼 Customer Churn Prediction 🚀")
+st.write("Fill out the form below to check if a customer is likely to churn or stay. 🧾")
 
 if model:
-    # Inputs for prediction
+    # ----------------------------
+    # Input Form
+    # ----------------------------
+    st.subheader("Customer Information ✨")
     gender = st.selectbox("👤 Gender", ["Male", "Female"])
     senior_citizen = st.selectbox("🎂 Senior Citizen", [0, 1])
-    partner = st.selectbox("💍 Partner", ["Yes", "No"])
-    dependents = st.selectbox("👶 Dependents", ["Yes", "No"])
-    tenure = st.number_input("📅 Tenure (months)", min_value=0, max_value=100, value=1)
+    partner = st.selectbox("💍 Has Partner?", ["Yes", "No"])
+    dependents = st.selectbox("👶 Has Dependents?", ["Yes", "No"])
+    tenure = st.number_input("📅 Tenure (months)", min_value=0, max_value=100, value=12)
     phone_service = st.selectbox("📞 Phone Service", ["Yes", "No"])
     multiple_lines = st.selectbox("📡 Multiple Lines", ["Yes", "No", "No phone service"])
     internet_service = st.selectbox("🌐 Internet Service", ["DSL", "Fiber optic", "No"])
@@ -53,10 +55,12 @@ if model:
     payment_method = st.selectbox("💳 Payment Method", [
         "Electronic check", "Mailed check", "Bank transfer (automatic)", "Credit card (automatic)"
     ])
-    monthly_charges = st.number_input("💵 Monthly Charges", min_value=0.0, value=50.0)
-    total_charges = st.number_input("💰 Total Charges", min_value=0.0, value=100.0)
+    monthly_charges = st.number_input("💵 Monthly Charges", min_value=0.0, value=70.0)
+    total_charges = st.number_input("💰 Total Charges", min_value=0.0, value=800.0)
 
-    # Convert input to dataframe (matching training format)
+    # ----------------------------
+    # Prepare input
+    # ----------------------------
     input_dict = {
         "gender": [gender],
         "SeniorCitizen": [senior_citizen],
@@ -78,9 +82,12 @@ if model:
         "MonthlyCharges": [monthly_charges],
         "TotalCharges": [total_charges],
     }
+
     input_df = pd.DataFrame(input_dict)
 
+    # ----------------------------
     # Prediction
+    # ----------------------------
     if st.button("🔮 Predict Churn"):
         try:
             prediction = model.predict(input_df)[0]
@@ -90,8 +97,9 @@ if model:
                 st.error(f"⚠️ Customer is **likely to churn** (probability: {probability:.2f})")
             else:
                 st.success(f"✅ Customer is **not likely to churn** (probability: {probability:.2f})")
+
         except Exception as e:
-            st.error(f"Prediction failed: {e}")
+            st.error(f"Prediction failed ❌: {e}")
 
 else:
     st.warning("⚠️ Please make sure `churn_model.pkl` exists in this folder.")
